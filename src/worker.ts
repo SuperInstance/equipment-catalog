@@ -1,424 +1,630 @@
+typescript
 interface Equipment {
   id: string;
   name: string;
   category: string;
-  compatibleVessels: string[];
-  installGuide: string;
-  byokRequirements: string[];
+  compatibleWith: string[];
+  installCommand: string;
+  description: string;
+  version: string;
 }
 
-interface CompatibilityMatrix {
+interface Compatibility {
   equipmentId: string;
-  vesselTypes: string[];
+  compatibleEquipment: string[];
   requirements: string[];
 }
 
-interface InstallRequest {
-  equipmentId: string;
-  vesselId: string;
-  userToken: string;
+interface Experiment {
+  id: string;
+  name: string;
+  equipmentIds: string[];
+  trafficSplit: number;
+  active: boolean;
+  createdAt: number;
+}
+
+interface Metrics {
+  experimentId: string;
+  installs: number;
+  errors: number;
+  lastUpdated: number;
 }
 
 const equipmentCatalog: Equipment[] = [
   {
-    id: "nav-001",
-    name: "Advanced Navigation System",
-    category: "Navigation",
-    compatibleVessels: ["cargo", "tanker", "cruise"],
-    installGuide: "Mount on bridge console, connect to power and data bus.",
-    byokRequirements: ["Navigation License", "System Calibration Certificate"]
+    id: "nextjs-14",
+    name: "Next.js 14",
+    category: "Framework",
+    compatibleWith: ["react-18", "typescript-5", "node-20"],
+    installCommand: "npx create-next-app@latest",
+    description: "React framework with app router and server components",
+    version: "14.0.0"
   },
   {
-    id: "com-002",
-    name: "Satellite Communicator",
-    category: "Communication",
-    compatibleVessels: ["cargo", "tanker", "fishing", "patrol"],
-    installGuide: "Install on upper deck with clear sky view, ground properly.",
-    byokRequirements: ["Frequency Authorization", "Antenna Alignment Tool"]
+    id: "react-18",
+    name: "React 18",
+    category: "Library",
+    compatibleWith: ["typescript-5", "webpack-5", "vite-5"],
+    installCommand: "npm install react@18 react-dom@18",
+    description: "JavaScript library for building user interfaces",
+    version: "18.2.0"
+  },
+  {
+    id: "typescript-5",
+    name: "TypeScript 5",
+    category: "Language",
+    compatibleWith: ["node-20", "webpack-5", "vite-5"],
+    installCommand: "npm install typescript@5",
+    description: "Typed JavaScript at any scale",
+    version: "5.3.0"
+  },
+  {
+    id: "node-20",
+    name: "Node.js 20",
+    category: "Runtime",
+    compatibleWith: ["typescript-5", "express-4"],
+    installCommand: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash",
+    description: "JavaScript runtime built on Chrome's V8 engine",
+    version: "20.10.0"
   }
 ];
 
-const compatibilityMatrix: CompatibilityMatrix[] = [
+const compatibilityData: Compatibility[] = [
   {
-    equipmentId: "nav-001",
-    vesselTypes: ["cargo", "tanker", "cruise"],
-    requirements: ["Bridge console space", "24V DC power"]
+    equipmentId: "nextjs-14",
+    compatibleEquipment: ["react-18", "typescript-5", "node-20"],
+    requirements: ["Node.js 18.17 or later"]
   },
   {
-    equipmentId: "com-002",
-    vesselTypes: ["cargo", "tanker", "fishing", "patrol"],
-    requirements: ["Upper deck mounting", "Grounding point"]
+    equipmentId: "react-18",
+    compatibleEquipment: ["typescript-5", "webpack-5"],
+    requirements: ["Modern browser with ES6 support"]
   }
 ];
 
-const HTML_HEADER = `<!DOCTYPE html>
+const experiments = new Map<string, Experiment>();
+const metrics = new Map<string, Metrics>();
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+function htmlResponse(content: string, status = 200): Response {
+  return new Response(content, {
+    status,
+    headers: {
+      "content-type": "text/html;charset=utf-8",
+      "content-security-policy": "default-src 'self'; style-src 'self' 'unsafe-inline';",
+      "x-frame-options": "DENY"
+    }
+  });
+}
+
+function jsonResponse(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json;charset=utf-8",
+      "content-security-policy": "default-src 'self';",
+      "x-frame-options": "DENY"
+    }
+  });
+}
+
+function renderPage(title: string, content: string): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hero: Equipment Catalog</title>
+  <title>${title} | Equipment Catalog</title>
   <style>
-    :root { --dark: #0a0a0f; --accent: #d97706; --light: #f8fafc; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: 'Inter', system-ui, sans-serif; 
-      background: var(--dark); 
-      color: var(--light); 
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0f;
+      color: #e5e5e5;
       line-height: 1.6;
       min-height: 100vh;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    header {
+      border-bottom: 1px solid #1f1f2e;
+      padding-bottom: 1rem;
+      margin-bottom: 2rem;
+    }
+    h1 {
+      color: #ffffff;
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .accent { color: #d97706; }
+    .subtitle {
+      color: #a1a1aa;
+      font-size: 1.1rem;
+    }
+    nav {
       display: flex;
-      flex-direction: column;
+      gap: 2rem;
+      margin-top: 1.5rem;
     }
-    header { 
-      background: rgba(10, 10, 15, 0.95); 
-      border-bottom: 2px solid var(--accent); 
-      padding: 1.5rem 2rem;
-      backdrop-filter: blur(10px);
+    nav a {
+      color: #d97706;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      transition: background 0.2s;
     }
-    .hero { 
-      padding: 3rem 2rem; 
-      text-align: center; 
-      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+    nav a:hover {
+      background: rgba(217, 119, 6, 0.1);
     }
-    .hero h1 { 
-      font-size: 3rem; 
-      margin-bottom: 1rem; 
-      color: var(--accent);
-      text-shadow: 0 0 20px rgba(217, 119, 6, 0.3);
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
     }
-    .hero p { 
-      font-size: 1.2rem; 
-      max-width: 800px; 
-      margin: 0 auto 2rem;
-      opacity: 0.9;
+    .card {
+      background: #15151f;
+      border: 1px solid #2a2a3a;
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      transition: transform 0.2s, border-color 0.2s;
     }
-    .container { 
-      max-width: 1200px; 
-      margin: 0 auto; 
-      padding: 0 2rem;
-      flex: 1;
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: #d97706;
     }
-    .features { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-      gap: 2rem; 
-      margin: 3rem 0;
+    .card h3 {
+      color: #ffffff;
+      margin-bottom: 0.5rem;
+      font-size: 1.25rem;
     }
-    .feature-card { 
-      background: rgba(255, 255, 255, 0.05); 
-      border: 1px solid rgba(217, 119, 6, 0.2); 
-      border-radius: 12px; 
-      padding: 1.5rem; 
-      transition: transform 0.3s, border-color 0.3s;
-    }
-    .feature-card:hover { 
-      transform: translateY(-5px); 
-      border-color: var(--accent);
-    }
-    .feature-card h3 { 
-      color: var(--accent); 
+    .category {
+      display: inline-block;
+      background: rgba(217, 119, 6, 0.1);
+      color: #d97706;
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 0.875rem;
       margin-bottom: 1rem;
-      font-size: 1.3rem;
     }
-    .btn { 
-      display: inline-block; 
-      background: var(--accent); 
-      color: var(--dark); 
-      padding: 0.75rem 1.5rem; 
-      border-radius: 6px; 
-      text-decoration: none; 
-      font-weight: 600; 
+    .description {
+      color: #a1a1aa;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    .install {
+      background: #1a1a2a;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 0.9rem;
+      margin: 1rem 0;
+      border-left: 3px solid #d97706;
+    }
+    .btn {
+      background: #d97706;
+      color: white;
       border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.3s;
+      transition: opacity 0.2s;
+      display: inline-block;
+      text-decoration: none;
+      font-size: 0.95rem;
     }
     .btn:hover { opacity: 0.9; }
-    .btn-outline { 
-      background: transparent; 
-      border: 2px solid var(--accent); 
-      color: var(--accent);
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #2a2a3a;
+      color: #e5e5e5;
     }
-    .footer { 
-      margin-top: auto; 
-      background: rgba(0, 0, 0, 0.4); 
-      padding: 2rem; 
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #a1a1aa;
+      font-weight: 500;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 0.5rem;
+      color: #e5e5e5;
+      font-family: inherit;
+    }
+    .footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid #1f1f2e;
+      color: #6b7280;
       text-align: center;
-      border-top: 1px solid rgba(217, 119, 6, 0.2);
+      font-size: 0.9rem;
     }
-    .fleet-footer { 
-      font-size: 0.9rem; 
-      opacity: 0.7; 
-      margin-top: 1rem;
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
     }
-    .api-endpoint { 
-      background: rgba(0, 0, 0, 0.3); 
-      padding: 0.5rem 1rem; 
-      border-radius: 4px; 
-      font-family: monospace; 
-      margin: 0.5rem 0;
-      border-left: 3px solid var(--accent);
+    .metric-card {
+      background: #15151f;
+      padding: 1.5rem;
+      border-radius: 0.75rem;
+      text-align: center;
     }
-    .health-status { 
-      display: inline-block; 
-      width: 12px; 
-      height: 12px; 
-      background: #10b981; 
-      border-radius: 50%; 
-      margin-right: 0.5rem;
+    .metric-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #d97706;
+      margin-bottom: 0.5rem;
+    }
+    .metric-label {
+      color: #a1a1aa;
+      font-size: 0.9rem;
+    }
+    .traffic-split {
+      height: 8px;
+      background: #2a2a3a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    .traffic-bar {
+      height: 100%;
+      background: #d97706;
+      border-radius: 4px;
     }
   </style>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>`;
-
-const HTML_FOOTER = `  <footer class="footer">
-    <div class="container">
-      <p>Hero Equipment Catalog &copy; ${new Date().getFullYear()}</p>
-      <div class="fleet-footer">
-        Part of the Hero Fleet Management System | Maritime Grade Equipment
-      </div>
-    </div>
-  </footer>
+<body>
+  <div class="container">
+    <header>
+      <h1>Equipment <span class="accent">Catalog</span></h1>
+      <p class="subtitle">Browse, install, and experiment with development equipment</p>
+      <nav>
+        <a href="/">Browse Equipment</a>
+        <a href="/experiments">Experiments</a>
+        <a href="/metrics">Metrics</a>
+        <a href="/health">Health</a>
+      </nav>
+    </header>
+    ${content}
+    <footer class="footer">
+      <p>Equipment Catalog Fleet &copy; ${new Date().getFullYear()}</p>
+      <p>Deployed on Cloudflare Workers | Zero Dependencies</p>
+    </footer>
+  </div>
 </body>
 </html>`;
-
-function renderHome(): string {
-  return `${HTML_HEADER}
-  <header>
-    <div class="container">
-      <h2>Hero Equipment Catalog</h2>
-    </div>
-  </header>
-  <main>
-    <section class="hero">
-      <div class="container">
-        <h1>Equipment Catalog</h1>
-        <p>Browse and install certified equipment for your vessels. Check compatibility, installation guides, and BYOK requirements.</p>
-        <div style="margin-top: 2rem;">
-          <a href="/api/equipment" class="btn">Browse Equipment</a>
-          <a href="/api/compatibility" class="btn btn-outline" style="margin-left: 1rem;">Check Compatibility</a>
-        </div>
-      </div>
-    </section>
-    <div class="container">
-      <section class="features">
-        <div class="feature-card">
-          <h3>Equipment Listing</h3>
-          <p>Browse certified maritime equipment with detailed specifications and installation requirements.</p>
-          <div class="api-endpoint">GET /api/equipment</div>
-        </div>
-        <div class="feature-card">
-          <h3>Compatibility Matrix</h3>
-          <p>Check vessel compatibility and technical requirements before installation.</p>
-          <div class="api-endpoint">GET /api/compatibility</div>
-        </div>
-        <div class="feature-card">
-          <h3>Install Guide</h3>
-          <p>Step-by-step installation procedures and safety guidelines.</p>
-          <div class="api-endpoint">POST /api/install</div>
-        </div>
-        <div class="feature-card">
-          <h3>BYOK Requirements</h3>
-          <p>Bring Your Own Key requirements and certification documentation.</p>
-          <div class="api-endpoint">GET /api/equipment?byok=true</div>
-        </div>
-      </section>
-      <section style="text-align: center; padding: 3rem 0;">
-        <h2 style="color: var(--accent); margin-bottom: 1rem;">System Status</h2>
-        <p><span class="health-status"></span> All systems operational</p>
-        <a href="/health" class="btn btn-outline" style="margin-top: 1rem;">Check Health</a>
-      </section>
-    </div>
-  </main>
-  ${HTML_FOOTER}`;
 }
 
 function renderEquipmentList(): string {
-  const items = equipmentCatalog.map(eq => `
-    <div class="feature-card">
-      <h3>${eq.name}</h3>
-      <p><strong>Category:</strong> ${eq.category}</p>
-      <p><strong>Compatible with:</strong> ${eq.compatibleVessels.join(", ")}</p>
-      <p><strong>Install Guide:</strong> ${eq.installGuide}</p>
-      <p><strong>BYOK Requirements:</strong> ${eq.byokRequirements.join(", ")}</p>
+  const cards = equipmentCatalog.map(equipment => `
+    <div class="card">
+      <span class="category">${equipment.category}</span>
+      <h3>${equipment.name} <small>v${equipment.version}</small></h3>
+      <p class="description">${equipment.description}</p>
+      <div class="install">${equipment.installCommand}</div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+        <button class="btn" onclick="installEquipment('${equipment.id}')">Install</button>
+        <a href="/api/compatibility?equipmentId=${equipment.id}" class="btn btn-secondary">Check Compatibility</a>
+      </div>
     </div>
   `).join("");
 
-  return `${HTML_HEADER}
-  <header>
-    <div class="container">
-      <h2>Equipment Catalog</h2>
-      <a href="/" class="btn" style="margin-top: 1rem;">Back to Home</a>
+  const script = `
+    <script>
+      async function installEquipment(id) {
+        const experiment = prompt("Enter experiment name (optional):");
+        const trafficSplit = experiment ? prompt("Traffic split % (1-100):", "50") : null;
+        
+        if (experiment && trafficSplit) {
+          const res = await fetch('/api/experiments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: experiment,
+              equipmentIds: [id],
+              trafficSplit: parseInt(trafficSplit)
+            })
+          });
+          
+          if (res.ok) {
+            alert('Experiment created and equipment installed!');
+          } else {
+            alert('Error creating experiment');
+          }
+        } else {
+          alert('Installing equipment...');
+          // Simulate installation
+          setTimeout(() => alert('Installation complete!'), 1000);
+        }
+      }
+    </script>
+  `;
+
+  return `
+    <h2>Available Equipment</h2>
+    <div class="grid">
+      ${cards}
     </div>
-  </header>
-  <main>
-    <div class="container">
-      <section style="padding: 2rem 0;">
-        <h1 style="color: var(--accent); margin-bottom: 2rem;">Available Equipment</h1>
-        <div class="features">
-          ${items}
-        </div>
-      </section>
-    </div>
-  </main>
-  ${HTML_FOOTER}`;
+    ${script}
+  `;
 }
 
-function renderCompatibility(): string {
-  const matrix = compatibilityMatrix.map(cm => `
-    <div class="feature-card">
-      <h3>${equipmentCatalog.find(e => e.id === cm.equipmentId)?.name || cm.equipmentId}</h3>
-      <p><strong>Vessel Types:</strong> ${cm.vesselTypes.join(", ")}</p>
-      <p><strong>Requirements:</strong> ${cm.requirements.join(", ")}</p>
-    </div>
-  `).join("");
+function renderExperiments(): string {
+  const experimentList = Array.from(experiments.values());
+  
+  if (experimentList.length === 0) {
+    return `
+      <h2>Experiments</h2>
+      <div class="card">
+        <h3>No experiments yet</h3>
+        <p>Create your first experiment to test equipment with traffic splitting.</p>
+        <a href="/new-experiment" class="btn">Create Experiment</a>
+      </div>
+    `;
+  }
 
-  return `${HTML_HEADER}
-  <header>
-    <div class="container">
-      <h2>Compatibility Matrix</h2>
-      <a href="/" class="btn" style="margin-top: 1rem;">Back to Home</a>
-    </div>
-  </header>
-  <main>
-    <div class="container">
-      <section style="padding: 2rem 0;">
-        <h1 style="color: var(--accent); margin-bottom: 2rem;">Equipment Compatibility</h1>
-        <div class="features">
-          ${matrix}
+  const cards = experimentList.map(exp => {
+    const expMetrics = metrics.get(exp.id);
+    return `
+      <div class="card">
+        <h3>${exp.name}</h3>
+        <p>Equipment: ${exp.equipmentIds.join(", ")}</p>
+        <div class="traffic-split">
+          <div class="traffic-bar" style="width: ${exp.trafficSplit}%"></div>
         </div>
-      </section>
+        <p>Traffic: ${exp.trafficSplit}% | Status: ${exp.active ? "Active" : "Paused"}</p>
+        ${expMetrics ? `
+          <div class="metrics">
+            <div class="metric-card">
+              <div class="metric-value">${expMetrics.installs}</div>
+              <div class="metric-label">Installs</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">${expMetrics.errors}</div>
+              <div class="metric-label">Errors</div>
+            </div>
+          </div>
+        ` : ""}
+        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+          <button class="btn" onclick="toggleExperiment('${exp.id}')">
+            ${exp.active ? "Pause" : "Resume"}
+          </button>
+          <button class="btn btn-secondary" onclick="viewMetrics('${exp.id}')">
+            View Metrics
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <h2>Experiments</h2>
+    <div style="margin-bottom: 2rem;">
+      <a href="/new-experiment" class="btn">Create New Experiment</a>
     </div>
-  </main>
-  ${HTML_FOOTER}`;
+    <div class="grid">
+      ${cards}
+    </div>
+    <script>
+      async function toggleExperiment(id) {
+        const res = await fetch('/api/experiments/' + id + '/toggle', { method: 'POST' });
+        if (res.ok) location.reload();
+      }
+      function viewMetrics(id) {
+        window.location.href = '/metrics?experimentId=' + id;
+      }
+    </script>
+  `;
 }
 
-function renderHealth(): string {
-  return JSON.stringify({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    services: {
-      equipment_catalog: "operational",
-      compatibility_matrix: "operational",
-      install_service: "operational"
-    },
-    uptime: process.uptime ? `${Math.floor(process.uptime())}s` : "unknown"
-  }, null, 2);
+function renderNewExperimentForm(): string {
+  const equipmentOptions = equipmentCatalog.map(e => 
+    `<option value="${e.id}">${e.name} (${e.category})</option>`
+  ).join("");
+
+  return `
+    <h2>Create New Experiment</h2>
+    <div class="card">
+      <form id="experimentForm" onsubmit="return createExperiment(event)">
+        <div class="form-group">
+          <label for="name">Experiment Name</label>
+          <input type="text" id="name" name="name" required placeholder="A/B Test v2.0">
+        </div>
+        
+        <div class="form-group">
+          <label for="equipmentIds">Select Equipment</label>
+          <select id="equipmentIds" name="equipmentIds" multiple required style="height: 150px;">
+            ${equipmentOptions}
+          </select>
+          <small style="color: #6b7280; display: block; margin-top: 0.5rem;">
+            Hold Ctrl/Cmd to select multiple items
+          </small>
+        </div>
+        
+        <div class="form-group">
+          <label for="trafficSplit">Traffic Split Percentage</label>
+          <input type="range" id="trafficSplit" name="trafficSplit" min="1" max="100" value="50" 
+                 oninput="document.getElementById('splitValue').textContent = this.value + '%'">
+          <div style="text-align: center; margin-top: 0.5rem;">
+            <span id="splitValue" style="color: #d97706; font-weight: bold;">50%</span>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <button type="submit" class="btn">Create Experiment</button>
+          <a href="/experiments" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+    
+    <script>
+      async function createExperiment(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const equipmentIds = Array.from(form.equipmentIds.selectedOptions).map(opt => opt.value);
+        
+        const experiment = {
+          name: form.name.value,
+          equipmentIds: equipmentIds,
+          trafficSplit: parseInt(form.trafficSplit.value)
+        };
+        
+        const res = await fetch('/api/experiments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(experiment)
+        });
+        
+        if (res.ok) {
+          alert('Experiment created successfully!');
+          window.location.href = '/experiments';
+        } else {
+          alert('Error creating experiment');
+        }
+      }
+    </script>
+  `;
+}
+
+function renderMetricsPage(): string {
+  const allMetrics = Array.from(metrics.values());
+  const totalInstalls = allMetrics.reduce((sum, m) => sum + m.installs, 0);
+  const totalErrors = allMetrics.reduce((sum, m) => sum + m.errors, 0);
+  const activeExperiments = Array.from(experiments.values()).filter(e => e.active).length;
+
+  return `
+    <h2>Metrics Dashboard</h2>
+    
+    <div class="metrics">
+      <div class="metric-card">
+        <div class="metric-value">${totalInstalls}</div>
+        <div class="metric-label">Total Installs</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${totalErrors}</div>
+        <div class="metric-label">Total Errors</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${activeExperiments}</div>
+        <div class="metric-label">Active Experiments</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">${equipmentCatalog.length}</div>
+        <div class="metric-label">Available Equipment</div>
+      </div>
+    </div>
+    
+    <h3 style="margin-top: 3rem;">Experiment Metrics</h3>
+    ${allMetrics.length > 0 ? `
+      <div class="grid">
+        ${allMetrics.map(m => {
+          const exp = experiments.get(m.experimentId);
+          return `
+            <div class="card">
+              <h3>${exp?.name || 'Unknown Experiment'}</h3>
+              <p>ID: ${m.experimentId}</p>
+              <div class="metrics">
+                <div class="metric-card">
+                  <div class="metric-value">${m.installs}</div>
+                  <div class="metric-label">Installs</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-value">${m.errors}</div>
+                  <div class="metric-label">Errors</div>
+                </div>
+              </div>
+              <p style="color: #6b7280; font-size: 0.875rem; margin-top: 1rem;">
+                Last updated: ${new Date(m.lastUpdated).toLocaleString()}
+              </p>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    ` : `
+      <div class="card">
+        <p>No metrics data available yet. Create an experiment to start collecting metrics.</p>
+      </div>
+    `}
+  `;
 }
 
 async function handleRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  const headers = new Headers({
-    "Content-Type": "text/html",
-    "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'"
-  });
+  const path = url.pathname;
 
-  if (url.pathname === "/" || url.pathname === "/index.html") {
-    return new Response(renderHome(), { headers });
+  // Health check endpoint
+  if (path === "/health") {
+    return jsonResponse({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      equipmentCount: equipmentCatalog.length,
+      experimentCount: experiments.size,
+      metricsCount: metrics.size
+    });
   }
 
-  if (url.pathname === "/health") {
-    headers.set("Content-Type", "application/json");
-    return new Response(renderHealth(), { headers });
+  // API endpoints
+  if (path === "/api/equipment") {
+    return jsonResponse(equipmentCatalog);
   }
 
-  if (url.pathname === "/api/equipment") {
-    if (request.method !== "GET") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { "Content-Type": "application/json" }
-      });
+  if (path === "/api/compatibility") {
+    const equipmentId = url.searchParams.get("equipmentId");
+    if (equipmentId) {
+      const compatibility = compatibilityData.find(c => c.equipmentId === equipmentId);
+      return compatibility ? jsonResponse(compatibility) : jsonResponse({ error: "Not found" }, 404);
     }
-
-    if (url.searchParams.get("format") === "json") {
-      headers.set("Content-Type", "application/json");
-      return new Response(JSON.stringify(equipmentCatalog, null, 2), { headers });
-    }
-
-    return new Response(renderEquipmentList(), { headers });
+    return jsonResponse(compatibilityData);
   }
 
-  if (url.pathname === "/api/compatibility") {
-    if (request.method !== "GET") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    if (url.searchParams.get("format") === "json") {
-      headers.set("Content-Type", "application/json");
-      return new Response(JSON.stringify(compatibilityMatrix, null, 2), { headers });
-    }
-
-    return new Response(renderCompatibility(), { headers });
-  }
-
-  if (url.pathname === "/api/install") {
-    if (request.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
+  if (path === "/api/experiments" && request.method === "POST") {
     try {
-      const body: InstallRequest = await request.json();
+      const data = await request.json() as Omit<Experiment, "id" | "createdAt" | "active">;
+      const experiment: Experiment = {
+        id: generateId(),
+        name: data.name,
+        equipmentIds: data.equipmentIds,
+        trafficSplit: Math.min(100, Math.max(1, data.trafficSplit)),
+        active: true,
+        createdAt: Date.now()
+      };
       
-      if (!body.equipmentId || !body.vesselId || !body.userToken) {
-        return new Response(JSON.stringify({ error: "Missing required fields" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      const equipment = equipmentCatalog.find(e => e.id === body.equipmentId);
-      if (!equipment) {
-        return new Response(JSON.stringify({ error: "Equipment not found" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      if (!equipment.compatibleVessels.includes(body.vesselId)) {
-        return new Response(JSON.stringify({ 
-          error: "Equipment not compatible with vessel type",
-          compatibleVessels: equipment.compatibleVessels
-        }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Installation scheduled",
-        equipment: equipment.name,
-        installGuide: equipment.installGuide,
-        byokRequirements: equipment.byokRequirements,
-        estimatedTime: "2-4 hours"
-      }, null, 2), {
-        headers: { "Content-Type": "application/json" }
+      experiments.set(experiment.id, experiment);
+      
+      // Initialize metrics for this experiment
+      metrics.set(experiment.id, {
+        experimentId: experiment.id,
+        installs: 0,
+        errors: 0,
+        lastUpdated: Date.now()
       });
-    } catch (error) {
-      return new Response(JSON.stringify({ error: "Invalid JSON" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      
+      return jsonResponse(experiment, 201);
+    } catch {
+      return jsonResponse({ error: "Invalid request" }, 400);
     }
   }
 
-  return new Response(JSON.stringify({ error: "Not found" }), {
-    status: 404,
-    headers: { "Content-Type": "application/json" }
-  });
-}
-
-export default {
-  async fetch(request: Request): Promise<Response> {
-    return handleRequest(request);
-  }
-};
+  if (path.startsWith("/api/experiments/") && path.endsWith("/toggle") && request.method === "POST") {
+    const id
+const sh={"Content-Security-Policy":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-ancestors 'none'","X-Frame-Options":"DENY"};
+export default{async fetch(r:Request){const u=new URL(r.url);if(u.pathname==='/health')return new Response(JSON.stringify({status:'ok'}),{headers:{'Content-Type':'application/json',...sh}});return new Response(html,{headers:{'Content-Type':'text/html;charset=UTF-8',...sh}});}};
